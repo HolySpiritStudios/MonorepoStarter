@@ -1,0 +1,9 @@
+---
+description: 'Auto-attached: Naming TS'
+globs: *.ts
+alwaysApply: false
+---
+
+Naming conventions:
+- File and folder names must be in lower middle snake case, for example backend\entrypoints\learning-api-handler.lambda.ts
+- File names must include the stereotype of the file at the end, preceded by a dot, for example `learning-api-handler.lambda.ts`. Common stereotypes include: lambda, container, controller, router, service, repository, entity, model, util.

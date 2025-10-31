@@ -1,0 +1,29 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Backend Test",
+      "type": "node",
+      "request": "launch",
+      "runtimeArgs": ["${workspaceRoot}/backend/node_modules/jest/bin/jest.js", "--runInBand", "${fileBasename}"],
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "cwd": "${workspaceFolder}/backend",
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"]
+    },
+    {
+      "name": "Debug Backend Server",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/debug/dev.ts",
+      "runtimeExecutable": "${workspaceFolder}/backend/node_modules/.bin/tsx",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"]
+    }
+  ]
+}

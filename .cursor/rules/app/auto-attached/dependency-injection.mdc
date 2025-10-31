@@ -1,0 +1,49 @@
+---
+description: 'Auto-attached: Dependency Injection'
+globs: backend\**\*.ts
+alwaysApply: false
+---
+
+The backend uses a poor man's version of dependency injection. This implies that all classes are instantiated within container functions, and all classes must receive through constructors all their external dependencies.
+
+Whenever a class is modified to add more dependencies to it, the containers where this class is instantiated must be found and updated such that they reference the dependencies.
+
+Examples:
+
+```typescript
+export async function buildLearningRouter(config: Partial<Environment> = {}, app?: App): Promise<LearningRouter> {
+  const environmentService = new EnvironmentService(config);
+  const secretsService = new SecretsService(environmentService);
+  const secretId = environmentService.get(EnvironmentVariable.SECRET_ID);
+  const secrets = await secretsService.getSecret<AppSecrets>(secretId); // secrets are pre-loaded by the container
+
+  const loggingEventHandler = new LoggingEventHandler();
+  const mixpanelEventHandler = new MixpanelEventHandler(secrets.MIXPANEL_TOKEN, environmentService);
+
+  const timeBackCredentials = {
+    // secrets are passed through by the container, never loaded by the class
+    timeBackClientId: secrets.TIMEBACK_CLIENT_ID,
+    timeBackClientSecret: secrets.TIMEBACK_CLIENT_SECRET,
+  };
+  const timeBackConfig = {
+    // env var configuration is composed by the container for each class
+    baseUrl: environmentService.get(EnvironmentVariable.TIMEBACK_BASE_URL) || '',
+  };
+  const timeBackService = new TimeBackService(timeBackCredentials, timeBackConfig);
+  const timeBackEventHandler = new TimeBackEventHandler(timeBackService);
+
+  const handlers = [loggingEventHandler, mixpanelEventHandler, timeBackEventHandler];
+
+  //...
+}
+```
+
+```typescript
+export class AuthenticationController implements IAuthenticationController {
+  // classes receive all their dependencies through constructors, and use private readonly properties to store them
+  // the properties are always defined within the constructor using the shorthand syntax
+  constructor(private readonly authenticationService: AuthenticationService) {}
+
+  // ...
+}
+```

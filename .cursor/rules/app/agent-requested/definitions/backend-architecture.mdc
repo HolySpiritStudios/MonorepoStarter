@@ -1,0 +1,17 @@
+---
+description: 'Definition: Backend Architecture'
+alwaysApply: false
+---
+
+Our backend runs on AWS Lambda with multiple APIs being served by a single Lambda. Each Lambda serves a path prefix as defined in the infra\constructs\backend.construct.ts file. These path prefixes correspond one-to-one with the backend modules (the folders under backend\app - except the common module which has no APIs).
+
+A typical API consists of the following files:
+
+- `backend\app\<module>\entities\<entity>.entity.ts`: Entities that are stored in the DynamoDB database.
+- `backend\app\<module>\models\<model>.model.ts`: Models for data transfer objects and transient data.
+- `backend\app\<module>\repositories\<repository>.repository.ts`: Repositories for accessing the entities from the DynamoDB database.
+- `backend\app\<module>\services\<service>.service.ts`: Services for encapsulating the business logic of the API.
+- `backend\app\<module>\controllers\<controller>.controller.ts`: Thin layers that compose multiple services into a single unified interface for the router to use. Each module has a single controller interface, implemented by one actual controller and one mock controller. The mock controller allows us to build the full API hierarchy of the application without instantiating all the dependencies.
+- `backend\app\<module>\router\<module>.router.ts`: Hono router that maps to the controller methods.
+- `backend\entrypoints\containers\<module>-router.container.ts`: The handcrafted dependency injection container that instantiates all the dependencies of the module and finally builds the router and returns it for use.
+- `backend\entrypoints\<module>-api-handler.lambda.ts`: The Lambda handler that is used to serve the API, which uses the router container to obtain the router, then builds a Hono app and serves the requests with it.

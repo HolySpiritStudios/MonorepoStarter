@@ -1,0 +1,11 @@
+---
+description: 'Auto-attached: Backend Controllers'
+globs: *.controller.ts
+alwaysApply: false
+---
+
+Controllers must:
+
+- Simply compose the service methods into a single unified interface.
+- Always have an interface that defines the methods that the controller must implement.
+- Always have a mock controller that implements the interface and can be used for testing, which just throws NotFound errors. See backend\app\common\utils\errors.ts for the errors.

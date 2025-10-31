@@ -1,0 +1,18 @@
+---
+globs: *.entity.ts,*.model.ts
+alwaysApply: false
+---
+
+Entities and models must:
+
+- Always use zod schemas and infered types.
+- Entities represent TypeScript objects that are posted in the database, whereas models can be used for any other TypeScript objects, including API request and response objects.
+
+Example:
+
+```typescript
+export const ltiLaunchResponseSchema = z.object({
+  redirectUrl: z.string().url().describe('URL to redirect the user to after successful LTI launch'),
+});
+export type LtiLaunchResponse = z.infer<typeof ltiLaunchResponseSchema>;
+```

@@ -1,0 +1,15 @@
+1. **Never Assume, Always Verify**: Never make assumptions about the codebase or requirements. Always gather complete context by exploring files, documentation, and asking clarifying questions before implementing any solution.
+2. **Leverage All Available Tools**: Fully utilize available tools (code search, web search, file reading, etc.) to gather context, understand the project structure, and make informed decisions.
+3. **Write Pure Functions**: Prefer immutable data and pure functions that return new objects rather than modifying existing state.
+4. **Embrace Simplicity (KISS)**: Keep it simple. Prefer straightforward solutions with fewer moving parts. Break complex logic into smaller, focused functions.
+5. **Follow Established Patterns**: Study and follow the patterns already present in the codebase. Maintain consistency with existing architecture.
+6. **Name With Purpose**: Use descriptive names that reveal intent for variables, functions, and classes.
+7. **Limit Function Scope (SRP)**: Functions should do one thing well. Classes should have a single responsibility, following the Single Responsibility Principle.
+8. **Minimize Control Flow**: Reduce conditionals and nesting. Consider early returns and guard clauses.
+9. **Avoid Repetition (DRY)**: Don't Repeat Yourself. Extract common logic into reusable functions.
+10. **Build Only What's Needed (YAGNI)**: You Aren't Gonna Need It. Avoid speculative features and over-engineering.
+11. **Handle Errors Gracefully**: Validate inputs, use appropriate error handling, and provide meaningful error messages.
+12. **Document Sparingly but Critically**: Let clear code speak for itself. Only document the "why" behind complex decisions or non-obvious implementations. Avoid redundant documentation of the "what".
+13. **Optimize Appropriately**: Write clear code first, optimize only when necessary and with measurements.
+14. **Consider Security**: Validate all inputs, follow the principle of least privilege, and be aware of common vulnerabilities.
+15. **Practice Consistency**: Follow consistent style and conventions across the codebase.

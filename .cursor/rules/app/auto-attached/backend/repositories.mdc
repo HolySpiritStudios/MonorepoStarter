@@ -1,0 +1,49 @@
+---
+description: 'Auto-attached: Backend Repositories'
+globs: *.repository.ts
+alwaysApply: false
+---
+
+Repositories must:
+
+- Always use DynamoDB document client for accessing the database.
+- Never expose DynamoDB keys, indexes or technical properties (such as `ExclusiveStartKey`). Only expose logical properties.
+- Use the following method name verbs to indicate the type of operation:
+  - `createXyz`
+  - `updateXyz`
+  - `deleteXyz`
+  - `upsertXyz`: Combines `createXyz` and `updateXyz` into a single method.
+  - `getXyz`: Finds a single entity by its primary key.
+  - `findXyzByAbcAndDef`: Finds multiple entities by a query. If there are more than 2 query parameters, make the method receive a single object with the query parameters.
+- Repositories must always expose just primitive CRUDQ operations with no business logic within.
+
+Example:
+
+```typescript
+
+export class UserStorageRepository {
+  // constructor ommitted for brevity
+
+  async getStorageData(userId: string, key: string): Promise<UserStorage | null> {
+    const result = await this.client.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: {
+          PK: `User#${userId}`,
+          SK: `Storage#${key}`,
+        },
+      }),
+    );
+
+    if (!result.Item) {
+      return null;
+    }
+
+    return {
+      storageKey: result.Item.storageKey,
+      userId: result.Item.userId,
+      data: result.Item.data,
+    };
+  }
+}
+```

@@ -1,0 +1,51 @@
+name: Deploy Ephemeral
+
+concurrency:
+  group: ephemeral-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+jobs:
+  derive-env:
+    runs-on: ubuntu-latest
+    outputs:
+      env-name: ${{ steps.setenv.outputs.env-name }}
+    steps:
+      - id: setenv
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          echo "Using PR number: $PR_NUM"
+          echo "env-name=pr$(printf '%04d' $PR_NUM)" >> $GITHUB_OUTPUT
+
+  deploy:
+    needs: derive-env
+    uses: ./.github/workflows/base-deploy.yml
+    with:
+      environment: ${{ needs.derive-env.outputs.env-name }}
+      environment-type: ephemeral
+      secret-id: ws-mono-st/backend/integration/secrets
+    secrets: inherit
+
+  print-stack-outputs:
+    needs: [derive-env, deploy]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup AWS credentials
+        uses: ./.github/actions/aws-setup
+      - name: Print stack outputs
+        if: github.event.pull_request.number != null
+        uses: trilogy-group/ws-lambda-process/actions/print-cfn-outputs@master
+        with:
+          stack-name: ws-mono-st-${{ needs.derive-env.outputs.env-name }}-stack
+          extra-content: |
+            ## Users
+
+            All users from integration were copied into the environment with password Password123!

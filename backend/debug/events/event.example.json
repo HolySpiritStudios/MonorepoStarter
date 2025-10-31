@@ -1,0 +1,7 @@
+{
+  "request": {
+    "headers": {
+      "authorization": "Bearer <paste-your-cognito-token-here>"
+    }
+  }
+}

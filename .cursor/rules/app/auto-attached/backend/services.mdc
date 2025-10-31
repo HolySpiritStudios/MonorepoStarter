@@ -1,0 +1,9 @@
+---
+description: 'Auto-attached: Backend Services'
+globs: backend\**\*.service.ts
+alwaysApply: false
+---
+
+- Services must encapsulate the full business logic required for the feature. They may orchestrate repositories or - integrations to achieve that functionality
+- Services should have a single purpose, like, for example, managing users, collecting feedback, etc.
+- All services must be async.

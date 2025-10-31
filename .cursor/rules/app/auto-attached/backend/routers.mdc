@@ -1,0 +1,51 @@
+---
+description: 'Auto-attached: Backend Routers'
+globs: *.router.ts
+alwaysApply: false
+---
+
+- Routers are responsible for defining the routes of the application.
+- They must use Zod schemas for defining the request bodies, path parameters, query parameters, and response bodies.
+- These Zod schemas must be part of the models.
+- The full functionality of the request must be encapsulated within the controller and its reference services.
+- The router only is responsible for routing the request to the appropriate controller and mapping parameters.
+- Paths protected by authentication must use the Cognito security specification.
+- Success and error responses should use the utilities from backend\app\common\utils\responses.ts.
+
+Example:
+
+```typescript
+export class LearningRouter {
+  // ...
+
+  private setupGetFactSets() {
+    this.app.openapi(
+      createRoute({
+        method: 'get',
+        path: this.prefixed('/skills/{skillId}/fact-sets'),
+        tags: ['Learning'],
+        summary: 'Get fact sets for a skill',
+        description: 'Retrieve fact sets and their facts for a specific skill',
+        security: [{ cognito: ['openid'] }],
+        request: {
+          params: getFactSetsParamsSchema,
+        },
+        responses: {
+          ...successResponse(getFactSetsResponseSchema),
+          ...errorResponses,
+        },
+      }),
+      async (c) => {
+        const params = c.req.valid('param');
+        const result = await this.controller.getFactSets(params.skillId);
+        const stripped = {
+          ...result,
+          skill: omit(['config'], result.skill),
+        };
+        return c.json(stripped, 200);
+      },
+    );
+  }
+}
+
+```

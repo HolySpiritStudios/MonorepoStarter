@@ -1,0 +1,52 @@
+name: Destroy Ephemeral
+
+concurrency:
+  group: ephemeral-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  derive-env:
+    runs-on: ubuntu-latest
+    outputs:
+      env-name: ${{ steps.setenv.outputs.env-name }}
+    steps:
+      - id: setenv
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          echo "Using PR number: $PR_NUM"
+          echo "env-name=pr$(printf '%04d' $PR_NUM)" >> $GITHUB_OUTPUT
+
+  destroy:
+    needs: derive-env
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: infra/pnpm-lock.yaml
+      - name: Install infra dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: ./infra
+      - name: Setup AWS credentials
+        uses: ./.github/actions/aws-setup
+        with:
+          secret-id: ws-mono-st/backend/integration/secrets
+
+      - name: Destroy stack
+        env:
+          ENVIRONMENT: ${{ needs.derive-env.outputs.env-name }}
+        run: pnpm run destroy:ephemeral
+        working-directory: ./infra

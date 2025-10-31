@@ -1,0 +1,9 @@
+*.d.ts
+tools/
+node_modules/
+pnpm-lock.yaml
+build
+cdk.out
+.aider.chat.history.md
+
+!.cursor/rules

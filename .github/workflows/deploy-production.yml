@@ -1,0 +1,30 @@
+name: Deploy Production
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      short-sha: ${{ steps.sha.outputs.short-sha }}
+      build-id: ${{ steps.sha.outputs.build-id }}
+    steps:
+      - id: sha
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "short-sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "build-id=main-${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+  deploy:
+    needs: setup
+    uses: ./.github/workflows/base-deploy.yml
+    with:
+      environment: production
+      secret-id: ws-mono-st/backend/production/secrets
+      aws-role: 'arn:aws:iam::856284715153:role/GithubActionsOidcCdkDeployRole'
+    secrets: inherit

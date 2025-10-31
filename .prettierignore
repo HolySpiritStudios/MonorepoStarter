@@ -1,0 +1,13 @@
+build/
+cdk.out/
+node_modules/
+app/node_modules/
+coverage/
+coverage-integration-tests/
+coverage-unit-tests/
+**/*.d.ts
+**/*.js
+pnpm-lock.yaml
+game/**
+dist/
+docs/generated/

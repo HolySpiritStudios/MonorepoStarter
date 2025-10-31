@@ -1,0 +1,276 @@
+---
+description: 'Definition: Adding a New Backend Module'
+alwaysApply: false
+---
+
+# Adding a New Backend Module
+
+To add a new backend module to the application, follow these steps:
+
+## 1. Create Module Directory Structure
+
+Create a new directory under `backend/app/<module-name>` with the following subdirectories:
+
+- `models/` - Zod schemas and TypeScript types for request/response objects
+- `interfaces/` - Controller interface definitions
+- `services/` - Business logic layer
+- `controllers/` - Controller implementation and mock controller
+- `routers/` - Hono router with OpenAPI specifications
+- `repositories/` (optional) - Database access layer if the module needs to persist data
+- `entities/` (optional) - DynamoDB entity definitions if the module needs to persist data
+
+## 2. Create Module Files
+
+### Models (`models/<name>.model.ts`)
+Define Zod schemas for request/response validation:
+
+```typescript
+import { z } from '@hono/zod-openapi';
+
+export const responseSchema = z.object({
+  message: z.string().openapi({ example: 'Example message' }),
+});
+
+export type Response = z.infer<typeof responseSchema>;
+```
+
+### Interface (`interfaces/<module>-controller.interface.ts`)
+Define the controller interface:
+
+```typescript
+import { Response } from '../models/<name>.model';
+
+export interface IModuleController {
+  getExample(): Promise<Response>;
+}
+```
+
+### Service (`services/<module>.service.ts`)
+Implement business logic:
+
+```typescript
+import { getAppLogger } from '../../common/utils/logger.util';
+import { Response } from '../models/<name>.model';
+
+const logger = getAppLogger('<module>-service');
+
+export class ModuleService {
+  getExample(): Promise<Response> {
+    logger.info('Fetching example');
+    return Promise.resolve({ message: 'Example' });
+  }
+}
+```
+
+### Controller (`controllers/<module>.controller.ts`)
+Implement the controller interface:
+
+```typescript
+import { getAppLogger } from '../../common/utils/logger.util';
+import { IModuleController } from '../interfaces/<module>-controller.interface';
+import { Response } from '../models/<name>.model';
+import { ModuleService } from '../services/<module>.service';
+
+const logger = getAppLogger('<module>-controller');
+
+export class ModuleController implements IModuleController {
+  constructor(private readonly moduleService: ModuleService) {}
+
+  async getExample(): Promise<Response> {
+    logger.info('Received example request');
+    return this.moduleService.getExample();
+  }
+}
+```
+
+### Mock Controller (`controllers/mock-<module>.controller.ts`)
+Implement mock for testing:
+
+```typescript
+import { NotFoundError } from '../../common/utils/errors';
+import { IModuleController } from '../interfaces/<module>-controller.interface';
+import { Response } from '../models/<name>.model';
+
+export class MockModuleController implements IModuleController {
+  getExample(): Promise<Response> {
+    throw new NotFoundError('Mock implementation');
+  }
+}
+```
+
+### Router (`routers/<module>.router.ts`)
+Define routes with OpenAPI specs:
+
+```typescript
+import { createRoute } from '@hono/zod-openapi';
+import type { APIGatewayProxyEvent, APIGatewayProxyEventV2 } from 'aws-lambda';
+import { LambdaEvent, handle } from 'hono/aws-lambda';
+import { App, errorResponses, successResponse } from '../../common/utils/routes.util';
+import { IModuleController } from '../interfaces/<module>-controller.interface';
+import { responseSchema } from '../models/<name>.model';
+
+export class ModuleRouter {
+  private readonly handler: ReturnType<typeof handle>;
+
+  constructor(
+    private readonly controller: IModuleController,
+    private readonly app: App,
+    private readonly basePath = '/<module>/v1',
+  ) {
+    this.setupGetExample();
+    this.handler = handle(this.app);
+  }
+
+  private prefixed(path: string): string {
+    return `${this.basePath}${path}`;
+  }
+
+  private setupGetExample() {
+    this.app.openapi(
+      createRoute({
+        method: 'get',
+        path: this.prefixed('/'),
+        tags: ['Module'],
+        summary: 'Get example',
+        description: 'Returns example data',
+        security: [{ cognito: ['openid'] }], // Remove if endpoint doesn't require auth
+        request: {},
+        responses: {
+          ...successResponse(responseSchema),
+          ...errorResponses,
+        },
+      }),
+      async (c) => {
+        const result = await this.controller.getExample();
+        return c.json(result, 200);
+      },
+    );
+  }
+
+  public route(event: APIGatewayProxyEvent | APIGatewayProxyEventV2) {
+    return this.handler(event as unknown as LambdaEvent);
+  }
+}
+```
+
+## 3. Create DI Container
+
+Create `backend/entrypoints/containers/<module>-router.container.ts`:
+
+```typescript
+import { Environment, EnvironmentService } from '../../app/common/utils/environment.util';
+import { type App, RoutesService } from '../../app/common/utils/routes.util';
+import { ModuleController } from '../../app/<module>/controllers/<module>.controller';
+import { IModuleController } from '../../app/<module>/interfaces/<module>-controller.interface';
+import { ModuleRouter } from '../../app/<module>/routers/<module>.router';
+import { ModuleService } from '../../app/<module>/services/<module>.service';
+
+// eslint-disable-next-line @typescript-eslint/require-await
+export async function buildModuleRouter(config: Partial<Environment> = {}, app?: App): Promise<ModuleRouter> {
+  const environmentService = new EnvironmentService(config);
+
+  const moduleService = new ModuleService();
+  const controller: IModuleController = new ModuleController(moduleService);
+  app ??= new RoutesService(environmentService).buildApp();
+  const router = new ModuleRouter(controller, app);
+  return router;
+}
+```
+
+## 4. Create Lambda Handler
+
+Create `backend/entrypoints/<module>-api-handler.lambda.ts`:
+
+```typescript
+import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import 'reflect-metadata';
+
+import { getAppLogger } from '../app/common/utils/logger.util';
+import { ModuleRouter } from '../app/<module>/routers/<module>.router';
+
+import { buildModuleRouter } from './containers/<module>-router.container';
+
+let router: ModuleRouter | null = null;
+
+const logger = getAppLogger('<module>-api-handler');
+
+async function getRouter(): Promise<ModuleRouter> {
+  if (!router) {
+    router = await buildModuleRouter();
+  }
+  return router;
+}
+
+export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  logger.info('Module API request received', {
+    method: event.httpMethod,
+    path: event.path,
+  });
+  const moduleRouter = await getRouter();
+  const result = await moduleRouter.route(event);
+  return result;
+}
+```
+
+## 5. Register Module in Infrastructure
+
+Update `infra/constructs/backend.construct.ts` in the `setupApiRoutes()` method:
+
+```typescript
+private setupApiRoutes(props: BackendConstructProps): void {
+  // ... existing routes ...
+
+  const moduleLambda = this.createLambdaFunction(props, '<module>-api-handler.lambda.ts');
+  const moduleResource = this.api.root.addResource('<module>').addResource('v1').addProxy();
+  this.addAllMethodProxy(moduleResource, moduleLambda, true); // Set to false if no auth required
+}
+```
+
+## 6. Register Module in Dev Server
+
+Update `backend/debug/dev.ts`:
+
+```typescript
+import { buildModuleRouter } from '../entrypoints/containers/<module>-router.container';
+
+export async function buildDevApp(config: Partial<Environment> = {}): Promise<App> {
+  // ... existing setup ...
+  await buildModuleRouter(config, app);
+  // ... rest of setup ...
+}
+```
+
+## 7. Update OpenAPI Tags
+
+Update `backend/app/common/utils/routes.util.ts` to add the module tag:
+
+```typescript
+tags: [
+  // ... existing tags ...
+  { name: 'Module', description: 'Module endpoints' },
+],
+```
+
+## 8. Register Mock in Test Container (Optional)
+
+Update `backend/entrypoints/containers/mock-uber-app.container.ts` for testing:
+
+```typescript
+import { MockModuleController } from '../../app/<module>/controllers/mock-<module>.controller';
+import { ModuleRouter } from '../../app/<module>/routers/<module>.router';
+
+export async function buildMockUberApp(config: Partial<Environment> = {}): Promise<App> {
+  // ... existing setup ...
+  new ModuleRouter(new MockModuleController(), app);
+  // ... rest of setup ...
+}
+```
+
+## Important Notes
+
+- Follow the naming convention: all files and folders use lower-middle-snake-case with stereotypes (e.g., `<module>.service.ts`)
+- Use dependency injection: all dependencies are passed through constructors
+- Controllers should be thin wrappers around services
+- Use Zod schemas for all request/response validation
+- Add OpenAPI documentation to all routes
+- Protected routes must use `security: [{ cognito: ['openid'] }]` in the route definition
