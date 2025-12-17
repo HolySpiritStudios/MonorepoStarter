@@ -137,6 +137,7 @@ During development, you should have the Development account selected in your AWS
 The project uses a single `.env` file in the root directory that's shared across all components (backend, frontend, game, and infrastructure).
 
 - **Ephemeral Environments**: Each pull request automatically creates a dedicated ephemeral environment for testing.
+  - Every account can sign in with `Password123!` as the password for staging and ephemeral environments.
 - **Environment Sync**: After starting a new pull request, after the environment is created, run `pnpm script update-env --pr <pr-number>` to sync the environment variables from the AWS stack outputs to your local .env file.
 
 ### Development Scripts
