@@ -1,5 +1,6 @@
-export default {
-  '*.md': 'prettier --write',
-  '*.json': 'prettier --write',
-  '*.ts': (filenames) => [...filenames.map((filename) => `prettier --write ${filename}`)],
+export const typescriptModuleConfig = {
+  '**/*.{json,md}': ['prettier --write'],
+  '**/*.ts': [() => 'tsc --noEmit', 'eslint --flag unstable_config_lookup_from_file --fix', 'prettier --write'],
 };
+
+export default typescriptModuleConfig;

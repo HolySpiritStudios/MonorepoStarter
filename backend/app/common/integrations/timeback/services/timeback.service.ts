@@ -1,12 +1,9 @@
-import { getAppLogger } from '../../../utils/logger.util';
 import {
   TimeBackConfig,
   TimeBackCredentials,
   TimeBackTokenResponse,
   timeBackTokenResponseSchema,
 } from '../models/timeback.model';
-
-const logger = getAppLogger('timeback-service');
 
 const SCOPES = [
   'https://purl.imsglobal.org/spec/caliper/v1p2/scope/events.write',
