@@ -47,7 +47,7 @@ import { getLambdaPath } from '../utils/directory.util';
 const CORS_OPTIONS: CorsOptions = {
   allowOrigins: Cors.ALL_ORIGINS,
   allowMethods: Cors.ALL_METHODS,
-  allowHeaders: Cors.DEFAULT_HEADERS,
+  allowHeaders: [...Cors.DEFAULT_HEADERS, 'Authorization', 'Content-Type'],
   allowCredentials: true,
 };
 

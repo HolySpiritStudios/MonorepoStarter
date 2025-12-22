@@ -1,9 +1,5 @@
+import { DefaultChatTransport, type UIMessage } from 'ai';
 import { fetchAuthSession } from 'aws-amplify/auth';
-
-export interface ChatTransportConfig {
-  url: string;
-  headers?: Record<string, string>;
-}
 
 /**
  * Utility for creating chat transports with authentication
@@ -33,34 +29,32 @@ export class ChatClientUtil {
    * Provides context-aware chat enriched with session data
    *
    * @param sessionId - Unique identifier for the session
-   * @returns Transport configuration for useChat hook
+   * @returns Transport object for useChat hook
    */
-  async getTransport(sessionId: string): Promise<ChatTransportConfig> {
-    const idToken = await this.getIdToken();
-    return {
-      url: `${this.baseUrl}/chat/v1/sessions/${encodeURIComponent(sessionId)}/stream`,
-      headers: {
-        Authorization: `Bearer ${idToken}`,
-        'Content-Type': 'application/json',
+  getTransport(sessionId: string): DefaultChatTransport<UIMessage> {
+    return new DefaultChatTransport({
+      api: `${this.baseUrl}/chat/v1/sessions/${encodeURIComponent(sessionId)}/stream`,
+      headers: async () => {
+        const token = await this.getIdToken();
+        return { Authorization: `Bearer ${token}` };
       },
-    };
+    });
   }
 
   /**
    * Get transport for generic chat (no session context)
    * Provides general-purpose chat without domain-specific context
    *
-   * @returns Transport configuration for useChat hook
+   * @returns Transport object for useChat hook
    */
-  async getGenericTransport(): Promise<ChatTransportConfig> {
-    const idToken = await this.getIdToken();
-    return {
-      url: `${this.baseUrl}/chat/v1/stream`,
-      headers: {
-        Authorization: `Bearer ${idToken}`,
-        'Content-Type': 'application/json',
+  getGenericTransport(): DefaultChatTransport<UIMessage> {
+    return new DefaultChatTransport({
+      api: `${this.baseUrl}/chat/v1/stream`,
+      headers: async () => {
+        const token = await this.getIdToken();
+        return { Authorization: `Bearer ${token}` };
       },
-    };
+    });
   }
 
   /**

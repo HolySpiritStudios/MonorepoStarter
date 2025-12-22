@@ -28,7 +28,7 @@ export function PromptInput({ onSubmit, children }: PromptInputProps) {
   const [value, setValue] = useState('');
 
   const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
+    e.preventDefault?.();
     if (value.trim()) {
       onSubmit({ text: value }, e);
       setValue('');

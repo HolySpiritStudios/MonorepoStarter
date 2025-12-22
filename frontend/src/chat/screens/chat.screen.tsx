@@ -1,9 +1,8 @@
 import { useChat } from '@ai-sdk/react';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { useParams } from 'react-router';
 
-import type { ChatTransportConfig } from '../../main/utils/clients/chat-client.util';
 import { getChatClientUtil } from '../../main/utils/clients/chat-client.util';
 import { ChatHeader } from '../components/chat-header.component';
 import { ChatInput } from '../components/chat-input.component';
@@ -20,31 +19,14 @@ import { ChatMessageList } from '../components/chat-message-list.component';
 export function ChatScreen() {
   const { sessionId } = useParams<{ sessionId?: string }>();
   const [streamError, setStreamError] = useState<string | null>(null);
-  const [config, setConfig] = useState<ChatTransportConfig | undefined>(undefined);
 
-  // Initialize transport based on session ID
-  useEffect(() => {
-    const initTransport = async () => {
-      try {
-        const chatClient = getChatClientUtil();
-        const newTransport = sessionId
-          ? await chatClient.getTransport(sessionId)
-          : await chatClient.getGenericTransport();
-        setConfig(newTransport);
-      } catch (error) {
-        console.error('[ChatScreen] Failed to initialize transport:', error);
-        setStreamError(error instanceof Error ? error.message : 'Failed to initialize chat');
-      }
-    };
-
-    initTransport();
-  }, [sessionId]);
+  const transport = useMemo(
+    () => (sessionId ? getChatClientUtil().getTransport(sessionId) : getChatClientUtil().getGenericTransport()),
+    [sessionId],
+  );
 
   const { messages, sendMessage, status, error } = useChat({
-    ...(config && {
-      body: config,
-      streamProtocol: 'text',
-    }),
+    transport,
     onError: (err) => {
       console.error('[ChatScreen] Stream error:', err);
       setStreamError(err.message);
