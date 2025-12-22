@@ -332,14 +332,13 @@ export class BackendConstruct extends Construct {
       entry: getLambdaPath(entryPath),
       runtime: Runtime.NODEJS_22_X,
       architecture: Architecture.ARM_64,
-      timeout: Duration.seconds(120), // Longer timeout for streaming
+      timeout: Duration.seconds(600), // Longer timeout for streaming
       memorySize: 2048, // More memory for AI SDK and streaming
       environment: this.getLambdaEnvVars(props),
       role: this.lambdaRole,
       bundling: {
         minify: isProduction(props.environment),
         sourceMap: !isProduction(props.environment),
-        externalModules: ['@smithy/eventstream-codec'], // Native module for streaming
       },
       logRetention: isProduction(props.environment) ? RetentionDays.ONE_YEAR : RetentionDays.TWO_WEEKS,
       description: `Streaming chat handler for ${props.environment} environment`,
