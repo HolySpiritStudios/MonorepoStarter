@@ -339,6 +339,10 @@ export class BackendConstruct extends Construct {
       bundling: {
         minify: isProduction(props.environment),
         sourceMap: !isProduction(props.environment),
+        // Critical for AI SDK with Bedrock streaming: bundle ALL dependencies including AWS SDK
+        // This ensures @smithy/eventstream-codec and related packages are included
+        bundleAwsSDK: true,
+        externalModules: [],
       },
       logRetention: isProduction(props.environment) ? RetentionDays.ONE_YEAR : RetentionDays.TWO_WEEKS,
       description: `Streaming chat handler for ${props.environment} environment`,
