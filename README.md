@@ -220,16 +220,23 @@ Frontend (React)              Backend (Lambda)           AI Services
 
 **Setup:**
 
-1. **Add MCP Configuration to Secrets** (Optional - chat works without MCP):
+1. **Add Configuration to Secrets** (Optional - chat works with defaults):
 
 ```json
 {
-  "MCP_URL": "https://ai-assistant.short.io/mcp",
-  "MCP_API_KEY": "your-shortio-api-key",
-  "SHORTIO_DOMAIN": "your-short-domain",
-  "SHORTIO_API_KEY": "your-shortio-api-key"
+  "MCP_SERVERS": "shortio|https://ai-assistant.short.io/mcp|your-api-key",
+  "CHAT_MODEL": "anthropic.claude-sonnet-4-20250514-v1:0"
 }
 ```
+
+**Configuration Options:**
+
+- `MCP_SERVERS` (optional): Comma-delimited list of MCP servers in format `"name|url|apiKey,name|url|apiKey"`
+  - Example: `"shortio|https://api1.com/mcp|key1,custom|https://api2.com/mcp|key2"`
+  - Without names: `"https://api1.com/mcp|key1,https://api2.com/mcp|key2"` (auto-assigned server1, server2, etc.)
+- `CHAT_MODEL` (optional): Bedrock model ID to use for chat
+  - Defaults to `anthropic.claude-opus-4-5-20251101-v1:0` (best for complex reasoning)
+  - Use `anthropic.claude-sonnet-4-20250514-v1:0` for faster, more cost-effective responses
 
 2. **Frontend Integration**:
 
@@ -262,6 +269,16 @@ const chatService = await ChatService.create({
   mcpApiKey: secrets.YOUR_MCP_API_KEY,
 });
 ```
+
+**Configuring the AI Model:**
+
+The AI model is configurable via the `CHAT_MODEL` secret in AWS Secrets Manager (see Setup section above). If not specified, it defaults to Claude Opus 4.5 for optimal performance.
+
+Available models:
+
+- `anthropic.claude-opus-4-5-20251101-v1:0` (default) - Best for complex reasoning and coding
+- `anthropic.claude-sonnet-4-20250514-v1:0` - Balanced performance and cost
+- Any other Bedrock-supported model ID
 
 **Removing the Chat Feature:**
 

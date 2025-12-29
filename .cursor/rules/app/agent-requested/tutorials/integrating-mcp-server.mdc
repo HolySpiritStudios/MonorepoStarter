@@ -1,0 +1,122 @@
+---
+description: Tutorial: Integrating MCP Servers
+alwaysApply: false
+---
+# Tutorial: Integrating MCP Servers
+
+## Quick Start
+
+Add multiple MCP servers using a single comma-delimited secret in AWS Secrets Manager. Tools are automatically namespaced by server name to prevent conflicts.
+
+### 1. Add Secret
+
+**Format:** `"name|url|apiKey,name|url|apiKey,..."` or `"url|apiKey,url|apiKey,..."`
+
+```bash
+# Get current secret
+aws secretsmanager get-secret-value \
+  --secret-id ws-mono-st/backend/integration/secrets \
+  --profile wseng \
+  --query SecretString | jq '.' > secret.json
+
+# Add MCP_SERVERS key (edit secret.json)
+{
+  "MCP_SERVERS": "shortio|https://ai-assistant.short.io/mcp|key123,custom|https://api2.com/mcp|key456",
+  ...existing keys...
+}
+
+# Update secret
+aws secretsmanager put-secret-value \
+  --secret-id ws-mono-st/backend/integration/secrets \
+  --profile wseng \
+  --secret-string file://secret.json && rm secret.json
+```
+
+### 2. Deploy
+
+```bash
+cd infra && ENVIRONMENT=integration pnpm cdk:deploy
+```
+
+### 3. Verify
+
+```bash
+aws logs tail /aws/lambda/ws-mono-st-integration-chat-api-handler \
+  --profile wseng \
+  --follow | grep MCP
+```
+
+Expected:
+```
+[INFO] Initializing MCP client { serverName: 'shortio', url: '...' }
+[INFO] MCP client initialized successfully { serverName: 'shortio', toolCount: 3 }
+[INFO] All MCP servers initialized { clientCount: 2, totalToolCount: 8, namespacedToolCount: 8 }
+```
+
+## Tool Namespacing
+
+**Problem:** Multiple servers may have tools with the same name.
+
+**Solution:** Tools are automatically namespaced by server name.
+
+**Example:**
+```
+Server "shortio" has tool "create_link"
+→ Becomes: "shortio_create_link"
+
+Server "custom" has tool "create_link"
+→ Becomes: "custom_create_link"
+
+Both coexist without conflict!
+```
+
+**Without names** (auto-assigned):
+```
+MCP_SERVERS="https://api1.com/mcp|key1,https://api2.com/mcp|key2"
+
+Server 1 tools: server1_tool_name
+Server 2 tools: server2_tool_name
+```
+## Removing MCP Servers
+
+To remove an MCP server from the configuration:
+
+1. Edit the `MCP_SERVERS` secret in AWS Secrets Manager
+2. Remove the server entry from the comma-delimited string
+3. When setting up be sure to remove the short.io server from the configuration.
+
+## Architecture
+
+```
+Container → Parse "name|url|key,..." → ChatService → Initialize each server
+                                                   → Namespace tools
+                                                   → Merge into single ToolSet
+                                                   → Pass to AI model
+```
+
+**Key Features:**
+- ✅ Unlimited MCP servers (comma-delimited)
+- ✅ Tool namespacing prevents conflicts
+- ✅ Graceful per-server error handling
+- ✅ Optional or auto-assigned server names
+- ✅ Single ToolSet passed to AI model
+
+## Troubleshooting
+
+### No tools loaded
+- Check format: `"name|url|apiKey"` or `"url|apiKey"`
+- Verify URL is HTTPS
+- Check API key validity
+
+### Tool name collisions (shouldn't happen)
+- Tools are auto-namespaced by server name
+- If you see collisions, check logs for duplicate server names
+
+### Some servers fail
+- Check logs for specific server errors
+- Other servers continue working (graceful degradation)
+
+## Related
+
+- [Backend Architecture](../definitions/backend-architecture.mdc)
+- [Adding a New Module](./adding-new-module.mdc)

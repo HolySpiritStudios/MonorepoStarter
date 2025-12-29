@@ -11,59 +11,96 @@ import { ChatMessage } from '../models/chat-stream.model';
 
 const logger = getAppLogger('chat-service');
 
-const DEFAULT_MODEL = 'anthropic.claude-sonnet-4-20250514-v1:0';
+// Default model: Claude Opus 4.5 for superior coding capabilities and complex reasoning
+// Can be overridden via ChatServiceConfig to support different models per use case
+const DEFAULT_MODEL = 'anthropic.claude-opus-4-5-20251101-v1:0';
+
+interface MCPServer {
+  url: string;
+  apiKey: string;
+  name?: string; // Optional name for tool namespacing
+}
 
 interface ChatServiceConfig {
-  // Optional MCP integration
-  mcpUrl?: string;
-  mcpApiKey?: string;
+  // Optional MCP integration - supports multiple servers
+  mcpServers?: MCPServer[];
+  // Optional model override (defaults to Claude Opus 4.5)
+  // Examples: 'anthropic.claude-sonnet-4-20250514-v1:0', 'anthropic.claude-opus-4-5-20251101-v1:0'
+  model?: string;
 }
 
 export class ChatService {
   private constructor(
     private readonly mcpTools: ToolSet,
+    private readonly model: string,
     private readonly contextService?: IContextService,
   ) {}
 
   /**
    * Factory method to create ChatService with optional MCP integration
-   * MCP is only initialized when configuration (URL + API key) is provided
+   * Supports multiple MCP servers - tools are namespaced by server to avoid conflicts
    * This allows the starter to work out-of-box without external dependencies
    */
   static async create(config: ChatServiceConfig, contextService?: IContextService): Promise<ChatService> {
-    logger.info('Initializing ChatService', { hasMCP: !!config.mcpUrl, hasContext: !!contextService });
+    const mcpServerCount = config.mcpServers?.length ?? 0;
+    const model = config.model || DEFAULT_MODEL;
+    logger.info('Initializing ChatService', { mcpServerCount, hasContext: !!contextService, model });
 
-    let mcpTools: ToolSet = {};
+    const allTools: ToolSet = {};
+    let totalToolCount = 0;
 
-    // Initialize MCP only if config provided
-    if (config.mcpUrl && config.mcpApiKey) {
-      try {
-        logger.info('Initializing MCP client', { url: config.mcpUrl });
-        const mcpClient = await createMCPClient({
-          transport: {
-            type: 'http',
-            url: config.mcpUrl,
-            headers: { 'X-Api-Key': config.mcpApiKey },
-          },
-        });
-        mcpTools = (await mcpClient.tools()) as ToolSet;
-        logger.info('MCP client initialized successfully', {
-          toolCount: Object.keys(mcpTools as Record<string, unknown>).length,
-        });
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const errorStack = error instanceof Error ? error.stack : undefined;
-        logger.error('Failed to initialize MCP client, continuing without MCP', {
-          error: errorMessage,
-          ...(errorStack && { stack: errorStack }),
-        });
-        // Continue without MCP - graceful degradation
+    // Initialize all MCP servers - namespace tools by server URL to avoid conflicts
+    if (config.mcpServers && config.mcpServers.length > 0) {
+      for (let i = 0; i < config.mcpServers.length; i++) {
+        const server: MCPServer = config.mcpServers[i];
+        const serverName: string = server.name || `server${i + 1}`;
+
+        try {
+          logger.info('Initializing MCP client', { serverName, url: server.url });
+          const mcpClient = await createMCPClient({
+            transport: {
+              type: 'http',
+              url: server.url,
+              headers: { 'X-Api-Key': server.apiKey },
+            },
+          });
+          const serverTools = (await mcpClient.tools()) as ToolSet;
+          const toolCount = Object.keys(serverTools as Record<string, unknown>).length;
+
+          // Namespace tools to prevent conflicts: tool_name -> serverName_tool_name
+          for (const [toolName, toolDef] of Object.entries(serverTools as Record<string, unknown>)) {
+            const namespacedName = `${serverName}_${toolName}`;
+            allTools[namespacedName] = toolDef as (typeof allTools)[string];
+          }
+
+          totalToolCount += toolCount;
+          logger.info('MCP client initialized successfully', {
+            serverName,
+            url: server.url,
+            toolCount,
+          });
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorStack = error instanceof Error ? error.stack : undefined;
+          logger.error('Failed to initialize MCP client, continuing with other servers', {
+            serverName,
+            url: server.url,
+            error: errorMessage,
+            ...(errorStack && { stack: errorStack }),
+          });
+          // Continue with other servers - graceful degradation
+        }
       }
+      logger.info('All MCP servers initialized', {
+        clientCount: config.mcpServers.length,
+        totalToolCount,
+        namespacedToolCount: Object.keys(allTools).length,
+      });
     } else {
-      logger.info('MCP configuration not provided, continuing without MCP tools');
+      logger.info('No MCP servers configured, continuing without MCP tools');
     }
 
-    return new ChatService(mcpTools, contextService);
+    return new ChatService(allTools, model, contextService);
   }
 
   /**
@@ -71,13 +108,18 @@ export class ChatService {
    * Uses default system prompt
    */
   streamChat(authContext: AuthContext, messages: ChatMessage[]): StreamTextResult<ToolSet, undefined> {
-    logger.info('Starting generic chat stream', { userId: authContext.userId, messageCount: messages.length });
+    logger.info('Starting generic chat stream', {
+      userId: authContext.userId,
+      messageCount: messages.length,
+      toolCount: Object.keys(this.mcpTools).length,
+      model: this.model,
+    });
 
     const systemPrompt = this.getDefaultPrompt();
     const modelMessages: ModelMessage[] = convertToModelMessages(messages);
 
     return streamText({
-      model: bedrock(DEFAULT_MODEL),
+      model: bedrock(this.model),
       system: systemPrompt,
       messages: modelMessages,
       tools: this.mcpTools,
@@ -107,6 +149,8 @@ export class ChatService {
       sessionId,
       userId: authContext.userId,
       messageCount: messages.length,
+      toolCount: Object.keys(this.mcpTools).length,
+      model: this.model,
     });
 
     const systemPrompt = this.contextService
@@ -116,7 +160,7 @@ export class ChatService {
     const modelMessages: ModelMessage[] = convertToModelMessages(messages);
 
     return streamText({
-      model: bedrock(DEFAULT_MODEL),
+      model: bedrock(this.model),
       system: systemPrompt,
       messages: modelMessages,
       tools: this.mcpTools,
