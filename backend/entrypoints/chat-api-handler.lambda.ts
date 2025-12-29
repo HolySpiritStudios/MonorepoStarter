@@ -63,7 +63,6 @@ export const handler = awslambda.streamifyResponse(async (event, responseStream)
       Connection: 'keep-alive',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
     },
   });
 
