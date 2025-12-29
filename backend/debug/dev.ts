@@ -7,6 +7,7 @@ import type { Context, Next } from 'hono';
 import { decodeJwt } from 'jose';
 import path from 'node:path';
 
+import { registerChatRoutes } from '../app/chat/routers/chat.hono-routes';
 import { DocsRouter } from '../app/common/routers/docs.router';
 import { Environment, EnvironmentService } from '../app/common/utils/environment.util';
 import { getAppLogger } from '../app/common/utils/logger.util';
@@ -30,8 +31,14 @@ export async function buildDevApp(config: Partial<Environment> = {}): Promise<Ap
   await buildAuthenticationRouter(config, app);
   await buildHelloWorldRouter(config, app);
 
-  // Register actual chat routes for local development
+  // IMPORTANT: Register actual working chat handlers BEFORE the OpenAPI routes
+  // Hono matches routes in order, so these will be used at runtime
   await registerLocalChatRoutes(config, app);
+
+  // Register OpenAPI documentation routes for chat
+  // These are registered AFTER actual handlers, but they still add metadata to OpenAPI spec
+  // The handlers won't be called because Hono already matched the routes above
+  registerChatRoutes(app, false);
 
   await DocsRouter.create(environmentService, routesService, app);
 

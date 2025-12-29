@@ -87,17 +87,34 @@ export const streamSessionChatRoute = createRoute({
 
 /**
  * Register chat routes in Hono app for OpenAPI generation
- * Note: These handlers are NEVER called - Lambda handles requests directly
+ * Note: These handlers are NEVER called in production - Lambda handles requests directly
  * This is purely for OpenAPI spec generation
+ *
+ * @param app - The Hono app instance
+ * @param registerHandlers - If false, only register routes for OpenAPI docs without handlers (useful for dev mode)
  */
-export function registerChatRoutes(app: App) {
-  app.openapi(streamChatRoute, () => {
-    // This handler is NEVER called - Lambda handles it directly
-    // But we need this for OpenAPI spec generation
-    throw new Error('This route should be handled by Lambda streaming handler');
-  });
+export function registerChatRoutes(app: App, registerHandlers = true) {
+  if (registerHandlers) {
+    // Production mode: register with error-throwing handlers
+    // (these should never actually be called since Lambda handles it)
+    app.openapi(streamChatRoute, () => {
+      throw new Error('This route should be handled by Lambda streaming handler');
+    });
 
-  app.openapi(streamSessionChatRoute, () => {
-    throw new Error('This route should be handled by Lambda streaming handler');
-  });
+    app.openapi(streamSessionChatRoute, () => {
+      throw new Error('This route should be handled by Lambda streaming handler');
+    });
+  } else {
+    // Dev mode: register only the OpenAPI metadata without handlers
+    // The actual handlers are registered separately in dev.ts
+    app.openapi(streamChatRoute, () => {
+      // This is a placeholder that should never be called in dev
+      // because the real handlers are registered first
+      throw new Error('Dev mode: Real handler should have been matched first');
+    });
+
+    app.openapi(streamSessionChatRoute, () => {
+      throw new Error('Dev mode: Real handler should have been matched first');
+    });
+  }
 }
