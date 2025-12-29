@@ -76,20 +76,33 @@ export const handler = awslambda.streamifyResponse(async (event, responseStream)
   }
 
   try {
+    logger.info('Getting chat router...');
     const router = await getRouter();
-    const stream = await router.route(event);
+    logger.info('Chat router initialized, routing request...');
 
+    const stream = await router.route(event);
     logger.info('Starting SSE stream');
 
     // Stream AI responses as Server-Sent Events
+    let chunkCount = 0;
     for await (const chunk of stream.toUIMessageStream()) {
+      chunkCount++;
       httpStream.write(`data: ${JSON.stringify(chunk)}\n\n`);
+      if (chunkCount % 10 === 0) {
+        logger.debug(`Streamed ${chunkCount} chunks`);
+      }
     }
 
-    logger.info('SSE stream completed successfully');
+    logger.info('SSE stream completed successfully', { totalChunks: chunkCount });
     httpStream.end();
   } catch (error) {
-    logger.error('Chat stream error', { error });
+    logger.error('Chat stream error', {
+      error,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      errorStack: error instanceof Error ? error.stack : undefined,
+      eventPath: path,
+      eventMethod: method,
+    });
     const message = error instanceof Error ? error.message : 'Unknown error';
 
     // Send error as SSE event

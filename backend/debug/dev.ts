@@ -1,17 +1,18 @@
 import { AssumeRoleCommand, Credentials, STSClient } from '@aws-sdk/client-sts';
 import { serve } from '@hono/node-server';
 
+import type { APIGatewayProxyEvent } from 'aws-lambda';
 import { config as dotenvConfig } from 'dotenv';
 import type { Context, Next } from 'hono';
 import { decodeJwt } from 'jose';
 import path from 'node:path';
 
-import { registerChatRoutes } from '../app/chat/routers/chat.hono-routes';
 import { DocsRouter } from '../app/common/routers/docs.router';
 import { Environment, EnvironmentService } from '../app/common/utils/environment.util';
 import { getAppLogger } from '../app/common/utils/logger.util';
 import { App, RoutesService } from '../app/common/utils/routes.util';
 import { buildAuthenticationRouter } from '../entrypoints/containers/auth-router.container';
+import { buildChatRouter } from '../entrypoints/containers/chat-service.container';
 import { buildHelloWorldRouter } from '../entrypoints/containers/hello-world-router.container';
 
 dotenvConfig({ path: path.resolve(__dirname, '../../.env') });
@@ -23,12 +24,14 @@ export async function buildDevApp(config: Partial<Environment> = {}): Promise<Ap
   const app = routesService.buildApp();
   app.use('*', localAuthMiddleware());
 
+  // Handle favicon requests to prevent 404 errors in logs
+  app.get('/favicon.ico', (c) => c.body(null, 204));
+
   await buildAuthenticationRouter(config, app);
   await buildHelloWorldRouter(config, app);
 
-  // Register chat routes for OpenAPI generation
-  // Note: Actual streaming is handled by Lambda, these are for docs only
-  registerChatRoutes(app);
+  // Register actual chat routes for local development
+  await registerLocalChatRoutes(config, app);
 
   await DocsRouter.create(environmentService, routesService, app);
 
@@ -43,6 +46,121 @@ interface CognitoJWTPayload {
   userId: string;
   'cognito:username'?: string;
   token_use: string;
+}
+
+/**
+ * Register chat routes that actually work in local development
+ * These routes handle streaming responses directly without Lambda
+ */
+async function registerLocalChatRoutes(config: Partial<Environment>, app: App): Promise<void> {
+  logger.info('Registering local chat routes with streaming support');
+
+  const chatRouter = await buildChatRouter(config);
+
+  // Generic chat streaming endpoint
+  app.post('/chat/v1/stream', async (c) => {
+    logger.info('Handling generic chat stream request');
+
+    try {
+      // Create a mock APIGatewayProxyEvent from Hono context
+      const event: Partial<APIGatewayProxyEvent> = {
+        httpMethod: 'POST',
+        path: '/chat/v1/stream',
+        body: JSON.stringify(await c.req.json()),
+        requestContext: (c.env.event?.requestContext || {}) as APIGatewayProxyEvent['requestContext'],
+      };
+
+      const stream = await chatRouter.route(event as APIGatewayProxyEvent);
+
+      // Set SSE headers
+      c.header('Content-Type', 'text/event-stream; charset=utf-8');
+      c.header('Cache-Control', 'no-cache');
+      c.header('Connection', 'keep-alive');
+
+      // Stream the response
+      const readable = new ReadableStream({
+        async start(controller) {
+          try {
+            for await (const chunk of stream.toUIMessageStream()) {
+              const data = `data: ${JSON.stringify(chunk)}\n\n`;
+              controller.enqueue(new TextEncoder().encode(data));
+            }
+            controller.close();
+          } catch (error) {
+            logger.error('Error streaming chat response', { error });
+            const errorData = `data: ${JSON.stringify({ type: 'error', errorText: error instanceof Error ? error.message : 'Unknown error' })}\n\n`;
+            controller.enqueue(new TextEncoder().encode(errorData));
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(readable, {
+        headers: {
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+        },
+      });
+    } catch (error) {
+      logger.error('Chat stream error', { error });
+      return c.json({ message: error instanceof Error ? error.message : 'Unknown error' }, 500);
+    }
+  });
+
+  // Session-specific chat streaming endpoint
+  app.post('/chat/v1/sessions/:sessionId/stream', async (c) => {
+    const sessionId = c.req.param('sessionId');
+    logger.info('Handling session chat stream request', { sessionId });
+
+    try {
+      // Create a mock APIGatewayProxyEvent from Hono context
+      const event: Partial<APIGatewayProxyEvent> = {
+        httpMethod: 'POST',
+        path: `/chat/v1/sessions/${sessionId}/stream`,
+        body: JSON.stringify(await c.req.json()),
+        requestContext: (c.env.event?.requestContext || {}) as APIGatewayProxyEvent['requestContext'],
+      };
+
+      const stream = await chatRouter.route(event as APIGatewayProxyEvent);
+
+      // Set SSE headers
+      c.header('Content-Type', 'text/event-stream; charset=utf-8');
+      c.header('Cache-Control', 'no-cache');
+      c.header('Connection', 'keep-alive');
+
+      // Stream the response
+      const readable = new ReadableStream({
+        async start(controller) {
+          try {
+            for await (const chunk of stream.toUIMessageStream()) {
+              const data = `data: ${JSON.stringify(chunk)}\n\n`;
+              controller.enqueue(new TextEncoder().encode(data));
+            }
+            controller.close();
+          } catch (error) {
+            logger.error('Error streaming session chat response', { error });
+            const errorData = `data: ${JSON.stringify({ type: 'error', errorText: error instanceof Error ? error.message : 'Unknown error' })}\n\n`;
+            controller.enqueue(new TextEncoder().encode(errorData));
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(readable, {
+        headers: {
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+        },
+      });
+    } catch (error) {
+      logger.error('Session chat stream error', { error });
+      return c.json({ message: error instanceof Error ? error.message : 'Unknown error' }, 500);
+    }
+  });
+
+  logger.info('Local chat routes registered successfully');
 }
 
 export function localAuthMiddleware() {
@@ -115,7 +233,7 @@ async function prepareEnvVars(port: number): Promise<void> {
 }
 
 export async function run(): Promise<void> {
-  const port = parseInt(process.env.PORT || process.argv[2] || '3000', 10);
+  const port = parseInt(process.env.PORT || process.argv[2] || '3001', 10);
   await prepareEnvVars(port);
 
   logger.info('Building development server...');

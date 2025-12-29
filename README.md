@@ -410,16 +410,133 @@ pnpm script upload-frontend --path <dist-path>             # Uploads frontend bu
 
 ```bash
 cd backend/
-pnpm run dev     # Start development server
-pnpm run test    # Run test suite
+pnpm run dev        # Start development server (default port 3001)
+pnpm run dev:watch  # Start development server with auto-reload
+pnpm run test       # Run test suite
+```
+
+**Note**: The backend dev server runs on port 3001 by default (since frontend uses 3000). You can specify a different port:
+
+```bash
+PORT=4000 pnpm run dev
 ```
 
 #### Frontend
 
 ```bash
 cd frontend/
-pnpm run dev     # Start development server with hot reload
+pnpm run dev     # Start development server with hot reload (default port 3000)
 ```
+
+### Local Chat Development
+
+The chat interface can be developed and tested completely locally. The backend dev server includes full support for streaming chat responses.
+
+#### Quick Start for Localhost Development
+
+1. **Add Cognito variables to your `.env` file** (in the root directory):
+
+   ```bash
+   # Frontend will automatically map these to VITE_ prefixed versions
+   ENVIRONMENT=localhost
+   AWS_REGION=us-east-1
+   USER_POOL_ID=your-user-pool-id
+   USER_POOL_CLIENT_ID=your-user-pool-client-id
+   USER_POOL_DOMAIN=your-user-pool-domain
+
+   # Backend configuration
+   SECRET_ID=your-secret-id  # Contains MCP_SERVERS and CHAT_MODEL configs
+   API_BASE_URL=http://localhost:3001
+   ```
+
+   **Note**: The Vite config automatically maps `AWS_REGION`, `USER_POOL_ID`, etc. to `VITE_AWS_REGION`, `VITE_USER_POOL_ID`, etc. for the frontend. You don't need to duplicate them with `VITE_` prefixes.
+
+2. **Start the backend** (runs on port 3001):
+
+   ```bash
+   cd backend/
+   pnpm run dev
+   ```
+
+3. **Start the frontend** (runs on port 3000):
+
+   ```bash
+   cd frontend/
+   pnpm run dev
+   ```
+
+4. **Access the app**: Open `http://localhost:3000?setEnv=localhost` in your browser
+
+   The `?setEnv=localhost` query parameter tells the frontend to use localhost configuration. This setting will be persisted in browser storage.
+
+#### Troubleshooting Login Issues
+
+If the login button doesn't work:
+
+1. **Check the browser console** - Look for a log message like `🔧 Localhost configuration:` that shows your Cognito settings
+2. **Verify environment variables** - Make sure `USER_POOL_ID`, `USER_POOL_CLIENT_ID`, and `USER_POOL_DOMAIN` are set in your `.env` file
+3. **Restart the frontend** - After changing `.env`, restart the Vite dev server to pick up new values
+4. **Clear browser storage** - Go to `http://localhost:3000?setEnv=localhost` to force the environment to localhost mode
+5. **Check the error** - If you see `❌ Missing required Cognito configuration!` in the console, your `.env` file is missing required values
+
+#### Switching Between Environments
+
+The frontend can switch between different environments using the `?setEnv` query parameter:
+
+- **Localhost**: `http://localhost:3000?setEnv=localhost` - Uses local backend at port 3001
+- **Integration**: `http://localhost:3000?setEnv=integration` - Uses deployed integration environment
+- **Production**: `http://localhost:3000?setEnv=production` - Uses production environment
+
+When you set the environment, it will be persisted in browser storage, so you only need to do this once.
+
+#### Starting the Backend Dev Server
+
+The server will be available at:
+
+- API: `http://localhost:3001`
+- API Docs: `http://localhost:3001/docs/viewer`
+- Chat endpoint: `http://localhost:3001/chat/v1/stream`
+
+#### Testing Chat Locally
+
+You can test the chat streaming API using various methods:
+
+**Using curl:**
+
+```bash
+# Test generic chat
+curl -N http://localhost:3001/chat/v1/stream \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [
+      {
+        "id": "msg-1",
+        "role": "user",
+        "content": "Hello! Tell me a joke.",
+        "createdAt": "2024-01-01T00:00:00Z",
+        "attachments": [],
+        "toolInvocations": []
+      }
+    ]
+  }'
+```
+
+**Using the test script:**
+
+```bash
+cd backend/
+tsx debug/test-chat.ts
+```
+
+#### Chat Configuration
+
+Chat settings are stored in AWS Secrets Manager (configured via `SECRET_ID` environment variable):
+
+- `MCP_SERVERS` (optional): JSON array of MCP server configurations
+- `CHAT_MODEL` (optional): Bedrock model ID (defaults to Claude Opus 4.5)
+
+For local development without MCP servers, the chat will work with the default model and no external tools.
 
 ### API Documentation & Testing
 

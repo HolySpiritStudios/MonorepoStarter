@@ -105,7 +105,7 @@ export class ChatService {
     const systemPrompt = this.getDefaultPrompt();
     const modelMessages: ModelMessage[] = convertToModelMessages(messages);
 
-    return streamText({
+    const result = streamText({
       model: bedrock(this.model),
       system: systemPrompt,
       messages: modelMessages,
@@ -120,7 +120,21 @@ export class ChatService {
           },
         },
       },
+      onFinish: ({ text, finishReason, usage, reasoning }) => {
+        logger.info('Stream finished', {
+          finishReason,
+          usage,
+          textLength: text?.length || 0,
+          hasReasoning: !!reasoning,
+          reasoningLength: reasoning?.length || 0,
+        });
+        if (reasoning) {
+          logger.info('Reasoning content', { reasoning });
+        }
+      },
     });
+
+    return result;
   }
 
   /**
@@ -146,7 +160,7 @@ export class ChatService {
 
     const modelMessages: ModelMessage[] = convertToModelMessages(messages);
 
-    return streamText({
+    const result = streamText({
       model: bedrock(this.model),
       system: systemPrompt,
       messages: modelMessages,
@@ -161,7 +175,22 @@ export class ChatService {
           },
         },
       },
+      onFinish: ({ text, finishReason, usage, reasoning }) => {
+        logger.info('Stream finished', {
+          sessionId,
+          finishReason,
+          usage,
+          textLength: text?.length || 0,
+          hasReasoning: !!reasoning,
+          reasoningLength: reasoning?.length || 0,
+        });
+        if (reasoning) {
+          logger.info('Reasoning content', { sessionId, reasoning });
+        }
+      },
     });
+
+    return result;
   }
 
   /**
