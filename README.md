@@ -160,10 +160,8 @@ The secrets in AWS Secrets Manager should follow this structure:
   "TIMEBACK_CLIENT_SECRET": "your-timeback-client-secret",
   "GOOGLE_CLIENT_ID": "your-google-client-id",
   "GOOGLE_CLIENT_SECRET": "your-google-client-secret",
-  "MCP_URL": "your-mcp-server-url",
-  "MCP_API_KEY": "your-mcp-api-key",
-  "SHORTIO_DOMAIN": "your-short-domain",
-  "SHORTIO_API_KEY": "your-shortio-api-key"
+  "MCP_SERVERS": "[{\"name\":\"shortio\",\"url\":\"https://ai-assistant.short.io/mcp\",\"auth\":{\"headerName\":\"authorization\",\"value\":\"your-api-key\"}}]",
+  "CHAT_MODEL": "global.anthropic.claude-opus-4-5-20251101-v1:0"
 }
 ```
 
@@ -177,41 +175,14 @@ The secrets in AWS Secrets Manager should follow this structure:
 - **TIMEBACK_CLIENT_SECRET**: OAuth client secret for TimeBack API integration (remove if not using TimeBack)
 - **GOOGLE_CLIENT_ID**: Google SSO OpenID client ID (remove if not using Google Sign-In)
 - **GOOGLE_CLIENT_SECRET**: Google SSO OpenID client ID (remove if not using Google Sign-In)
-- **MCP_URL**: MCP server URL for AI tool integrations (optional, remove if not using AI chat with tools)
-- **MCP_API_KEY**: API key for MCP server authentication (optional, remove if not using AI chat with tools)
-- **SHORTIO_DOMAIN**: Your Short.io domain for URL shortening (optional, example MCP integration)
-- **SHORTIO_API_KEY**: Short.io API key for URL shortening (optional, example MCP integration)
+- **MCP_SERVERS**: JSON array of MCP server configurations (as a string)
+- **CHAT_MODEL**: Bedrock model ID to use for chat
 
 ## Extra Features
 
 ### AI Chat (with MCP Tool Use)
 
 This starter includes a production-ready AI chat feature powered by Amazon Bedrock and the AI SDK, with support for Model Context Protocol (MCP) tool integrations.
-
-**Key Features:**
-
-- **Streaming Responses**: Uses AWS Lambda Response Streaming for real-time Server-Sent Events (SSE)
-- **Extended Thinking**: Claude Sonnet 4.5 with reasoning budgets for thoughtful responses
-- **Tool Use**: MCP integration for extensible tool capabilities (Short.io URL shortening included as example)
-- **Session Context**: Optional session-specific context enrichment for personalized responses
-- **Type-Safe**: Fully typed with Zod schemas and TypeScript
-- **OpenAPI Documented**: Routes registered in OpenAPI spec for easy testing
-
-**Architecture:**
-
-```
-Frontend (React)              Backend (Lambda)           AI Services
-┌─────────────────┐          ┌──────────────────┐      ┌─────────────┐
-│ ChatSidepanel   │          │ chat-api-handler │      │   Bedrock   │
-│   Component     │──POST───▶│   (streaming)    │─────▶│   Claude    │
-│                 │          │                  │      │  Sonnet 4.5 │
-│ useChat hook    │◀──SSE────│  ChatRouter      │      └─────────────┘
-│ (@ai-sdk/react) │          │  ChatService     │
-└─────────────────┘          │  ChatController  │      ┌─────────────┐
-                             │                  │      │ MCP Tools   │
-                             │  MCP Integration │─────▶│ (Short.io)  │
-                             └──────────────────┘      └─────────────┘
-```
 
 **API Endpoints:**
 
@@ -262,14 +233,6 @@ To add session-specific context (e.g., user data, documents, etc.):
 **Adding Custom MCP Tools:**
 
 1. Update secrets with your MCP server URL and credentials
-2. Modify `backend/entrypoints/containers/chat-service.container.ts`:
-
-```typescript
-const chatService = await ChatService.create({
-  mcpUrl: secrets.YOUR_MCP_URL,
-  mcpApiKey: secrets.YOUR_MCP_API_KEY,
-});
-```
 
 **Configuring the AI Model:**
 
@@ -342,21 +305,21 @@ Once you're done with all the setup steps above (placeholders, secrets, visual i
 ```
 wseng-monorepo-starter/
 ├── backend/          # TypeScript/Node.js API server
-│   ├── app/          # Core application modules
-│   │   ├── authentication/    # User auth & session management
-│   ├── entrypoints/  # AWS Lambda handlers
-│   └── scripts/      # Database migrations & maintenance scripts
+│   ├── app/          # Core application modules (auth, chat, hello-world)
+│   ├── entrypoints/  # AWS Lambda handlers & DI containers
+│   └── debug/        # Local development & debugging server
 ├── frontend/         # React/TypeScript web application
 │   ├── src/          # Application source code
-│   │   ├── common/           # Shared components & utilities
-│   │   ├── main/             # Core app features & screens
-│   │   ├── config/           # App configuration & settings
-│   │   └── user-management/  # User account & profile management
+│   │   ├── chat/             # AI Chat feature & screens
+│   │   ├── user-management/  # User account & profile management
+│   │   ├── main/             # Core layout, routers & app-wide utils
+│   │   └── common/           # Reusable UI components & hooks
 │   └── public/       # Static assets & resources
+├── shared/           # Shared constants & types (Single Source of Truth)
 ├── infra/           # AWS CDK infrastructure as code
 │   ├── constructs/  # Reusable infrastructure components
-│   ├── stacks/      # CloudFormation stack definitions
-│   └── scripts/     # Deployment & maintenance scripts
+│   └── stacks/      # CloudFormation stack definitions
+├── scripts/          # Workspace maintenance & sync scripts
 └── docs/            # Documentation & development guides
 ```
 
@@ -382,104 +345,60 @@ During development, you should have the Development account selected in your AWS
 
 ### Environment Setup
 
-The project uses a single `.env` file in the root directory that's shared across all components (backend, frontend, game, and infrastructure).
+The project uses a single `.env` file in the root directory shared across all components. To set up your local environment:
 
-- **Ephemeral Environments**: Each pull request automatically creates a dedicated ephemeral environment for testing.
-  - Every account can sign in with `Password123!` as the password for staging and ephemeral environments.
-- **Environment Sync**: After starting a new pull request, after the environment is created, run `pnpm script update-env --pr <pr-number>` to sync the environment variables from the AWS stack outputs to your local .env file.
-
-### Development Scripts
-
-#### Root
-
-```bash
-pnpm run check   # Runs linting, formatting, and type checking
-pnpm run fix     # Fixing linting and formatting issues
-```
-
-Additional scripts (automatically picked up if placed in a `scripts/` directory). Run scripts with `pnpm script <script-name> [options]`:
-
-```bash
-pnpm script update-env [--env <env>] [--pr <pr-number>]     # Syncs environment variables from AWS stack outputs to .env
-
-# Deployment
-pnpm script upload-frontend --path <dist-path>             # Uploads frontend build to S3 & invalidates CloudFront
-```
-
-#### Backend
-
-```bash
-cd backend/
-pnpm run dev        # Start development server (default port 3001)
-pnpm run dev:watch  # Start development server with auto-reload
-pnpm run test       # Run test suite
-```
-
-**Note**: The backend dev server runs on port 3001 by default (since frontend uses 3000). You can specify a different port:
-
-```bash
-PORT=4000 pnpm run dev
-```
-
-#### Frontend
-
-```bash
-cd frontend/
-pnpm run dev     # Start development server with hot reload (default port 3000)
-```
-
-### Local Chat Development
-
-The chat interface can be developed and tested completely locally. The backend dev server includes full support for streaming chat responses.
-
-#### Quick Start for Localhost Development
-
-1. **Add Cognito variables to your `.env` file** (in the root directory):
+1. **Sync from AWS**: Run the update script to populate your `.env` file with the correct resource IDs (Cognito, Secrets Manager, etc.) from a deployed environment:
 
    ```bash
-   # Frontend will automatically map these to VITE_ prefixed versions
-   ENVIRONMENT=localhost
-   AWS_REGION=us-east-1
-   USER_POOL_ID=your-user-pool-id
-   USER_POOL_CLIENT_ID=your-user-pool-client-id
-   USER_POOL_DOMAIN=your-user-pool-domain
+   # For a shared environment (e.g., integration)
+   pnpm script update-env --env integration
 
-   # Backend configuration
-   SECRET_ID=your-secret-id  # Contains MCP_SERVERS and CHAT_MODEL configs
+   # For a pull request environment
+   pnpm script update-env --pr <pr-number>
+   ```
+
+2. **Configure for Local Development**: To use the local backend server instead of the deployed one, update the following variables in your `.env`:
+
+   ```bash
+   ENVIRONMENT=localhost
    API_BASE_URL=http://localhost:3001
    ```
 
-   **Note**: The Vite config automatically maps `AWS_REGION`, `USER_POOL_ID`, etc. to `VITE_AWS_REGION`, `VITE_USER_POOL_ID`, etc. for the frontend. You don't need to duplicate them with `VITE_` prefixes.
+   **Note**: The Vite config automatically maps `AWS_REGION`, `USER_POOL_ID`, etc., to their `VITE_` prefixed versions for the frontend. You do not need to duplicate them.
 
-2. **Start the backend** (runs on port 3001):
+### Quality & Maintenance
 
-   ```bash
-   cd backend/
-   pnpm run dev
-   ```
+Run these from the root directory to maintain code quality:
 
-3. **Start the frontend** (runs on port 3000):
+```bash
+pnpm run check   # Runs linting, formatting, and type checking across the monorepo
+pnpm run fix     # Automatically fixes linting and formatting issues
+```
 
-   ```bash
-   cd frontend/
-   pnpm run dev
-   ```
+### Starting Development Servers
 
-4. **Access the app**: Open `http://localhost:3000?setEnv=localhost` in your browser
+The chat interface and API can be developed completely locally. The backend dev server includes full support for streaming chat responses.
 
-   The `?setEnv=localhost` query parameter tells the frontend to use localhost configuration. This setting will be persisted in browser storage.
+#### 1. Backend
 
-#### Troubleshooting Login Issues
+```bash
+cd backend/
+pnpm run dev        # Start server on http://localhost:3001
+pnpm run dev:watch  # Start server with auto-reload
+```
 
-If the login button doesn't work:
+#### 2. Frontend
 
-1. **Check the browser console** - Look for a log message like `🔧 Localhost configuration:` that shows your Cognito settings
-2. **Verify environment variables** - Make sure `USER_POOL_ID`, `USER_POOL_CLIENT_ID`, and `USER_POOL_DOMAIN` are set in your `.env` file
-3. **Restart the frontend** - After changing `.env`, restart the Vite dev server to pick up new values
-4. **Clear browser storage** - Go to `http://localhost:3000?setEnv=localhost` to force the environment to localhost mode
-5. **Check the error** - If you see `❌ Missing required Cognito configuration!` in the console, your `.env` file is missing required values
+```bash
+cd frontend/
+pnpm run dev        # Start server on http://localhost:3000
+```
 
-#### Switching Between Environments
+#### 3. Access the App
+
+Open `http://localhost:3000?setEnv=localhost` in your browser. The `?setEnv=localhost` parameter tells the frontend to use the local backend. This setting is persisted in browser storage.
+
+### Switching Between Environments
 
 The frontend can switch between different environments using the `?setEnv` query parameter:
 
@@ -487,58 +406,17 @@ The frontend can switch between different environments using the `?setEnv` query
 - **Integration**: `http://localhost:3000?setEnv=integration` - Uses deployed integration environment
 - **Production**: `http://localhost:3000?setEnv=production` - Uses production environment
 
-When you set the environment, it will be persisted in browser storage, so you only need to do this once.
+### Troubleshooting Login Issues
 
-#### Starting the Backend Dev Server
+If the login button doesn't work:
 
-The server will be available at:
-
-- API: `http://localhost:3001`
-- API Docs: `http://localhost:3001/docs/viewer`
-- Chat endpoint: `http://localhost:3001/chat/v1/stream`
-
-#### Testing Chat Locally
-
-You can test the chat streaming API using various methods:
-
-**Using curl:**
-
-```bash
-# Test generic chat
-curl -N http://localhost:3001/chat/v1/stream \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "messages": [
-      {
-        "id": "msg-1",
-        "role": "user",
-        "content": "Hello! Tell me a joke.",
-        "createdAt": "2024-01-01T00:00:00Z",
-        "attachments": [],
-        "toolInvocations": []
-      }
-    ]
-  }'
-```
-
-**Using the test script:**
-
-```bash
-cd backend/
-tsx debug/test-chat.ts
-```
-
-#### Chat Configuration
-
-Chat settings are stored in AWS Secrets Manager (configured via `SECRET_ID` environment variable):
-
-- `MCP_SERVERS` (optional): JSON array of MCP server configurations
-- `CHAT_MODEL` (optional): Bedrock model ID (defaults to Claude Opus 4.5)
-
-For local development without MCP servers, the chat will work with the default model and no external tools.
+1. **Check the browser console**: Look for a log message like `🔧 Localhost configuration:` that shows your Cognito settings.
+2. **Verify environment variables**: Ensure `USER_POOL_ID`, `USER_POOL_CLIENT_ID`, and `USER_POOL_DOMAIN` are set in your `.env` file.
+3. **Restart the frontend**: After changing `.env`, restart the Vite dev server to pick up new values.
+4. **Clear browser storage**: Go to `http://localhost:3000?setEnv=localhost` to force the environment to localhost mode.
 
 ### API Documentation & Testing
 
-- **API Documentation**: Available at `/docs/viewer` on the backend, or check `/docs/llms.txt` and `/docs/openapi.json`
-- **Postman Collection**: [API Collection](https://ws-eng.postman.co/workspace/TimeBack---L%2526E-Home-App~d3ecf06e-3181-4e79-af6d-a5a65107c690/overview)
+- **Backend API**: `http://localhost:3001`
+- **API Documentation**: Available at `/docs/viewer` on the backend, or check `/docs/llms.txt` and `/docs/openapi.json`.
+- **Chat Streaming**: Handled directly via SSE at `/chat/v1/stream`.
