@@ -101,6 +101,8 @@ export class ChatService {
               totalTools: totalToolCount,
             }),
         });
+
+        // Add any more debug tools here :)
       }
 
       logger.info('All MCP servers initialized', {

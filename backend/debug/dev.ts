@@ -1,6 +1,7 @@
 import { AssumeRoleCommand, Credentials, STSClient } from '@aws-sdk/client-sts';
 import { serve } from '@hono/node-server';
-import { API_ROUTES, SSE_HEADERS } from '@ws-mono/shared';
+import { API_ROUTES } from '@ws-mono/shared/constants/api-routes.constant';
+import { SSE_HEADERS } from '@ws-mono/shared/constants/sse-headers.constant';
 
 import type { APIGatewayProxyEvent } from 'aws-lambda';
 import { config as dotenvConfig } from 'dotenv';

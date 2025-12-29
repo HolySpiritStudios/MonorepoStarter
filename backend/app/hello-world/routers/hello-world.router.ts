@@ -1,5 +1,5 @@
 import { createRoute } from '@hono/zod-openapi';
-import { API_ROUTES } from '@ws-mono/shared';
+import { API_ROUTES } from '@ws-mono/shared/constants/api-routes.constant';
 
 import type { APIGatewayProxyEvent, APIGatewayProxyEventV2 } from 'aws-lambda';
 import { LambdaEvent, handle } from 'hono/aws-lambda';

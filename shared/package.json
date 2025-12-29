@@ -5,6 +5,8 @@
   "main": "./index.ts",
   "types": "./index.ts",
   "scripts": {
-    "check:types": "tsc --noEmit"
+    "check:types": "tsc --noEmit",
+    "check:lint": "eslint .",
+    "fix:lint": "eslint . --fix"
   }
 }

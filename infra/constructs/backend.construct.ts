@@ -1,4 +1,4 @@
-import { SSE_HEADERS } from '@ws-mono/shared';
+import { SSE_HEADERS } from '@ws-mono/shared/constants/sse-headers.constant';
 
 import { CfnOutput, Duration, RemovalPolicy, Stack } from 'aws-cdk-lib';
 import {

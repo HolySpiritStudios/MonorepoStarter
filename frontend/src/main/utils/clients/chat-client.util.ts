@@ -1,4 +1,4 @@
-import { API_ROUTES } from '@ws-mono/shared';
+import { API_ROUTES } from '@ws-mono/shared/constants/api-routes.constant';
 
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { fetchAuthSession } from 'aws-amplify/auth';

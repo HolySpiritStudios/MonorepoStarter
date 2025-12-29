@@ -1,4 +1,4 @@
-import { SSE_HEADERS } from '@ws-mono/shared';
+import { SSE_HEADERS } from '@ws-mono/shared/constants/sse-headers.constant';
 
 import type { APIGatewayProxyEvent, APIGatewayProxyEventV2 } from 'aws-lambda';
 import 'reflect-metadata';

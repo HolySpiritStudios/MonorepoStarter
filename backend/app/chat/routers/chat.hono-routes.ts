@@ -1,5 +1,5 @@
 import { createRoute } from '@hono/zod-openapi';
-import { API_ROUTES } from '@ws-mono/shared';
+import { API_ROUTES } from '@ws-mono/shared/constants/api-routes.constant';
 
 import { z } from 'zod';
 
